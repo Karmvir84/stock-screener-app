@@ -1,0 +1,183 @@
+from flask import Flask, render_template_string, request, jsonify
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
+
+app = Flask(_name_)
+
+# Top 20 Indian Stocks for Backtesting
+TOP_STOCKS = [
+    'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'HINDUNILVR.NS',
+    'ICICIBANK.NS', 'KOTAKBANK.NS', 'BHARTIARTL.NS', 'ITC.NS', 'SBIN.NS',
+    'ASIANPAINT.NS', 'DMART.NS', 'BAJFINANCE.NS', 'WIPRO.NS', 'SUNPHARMA.NS',
+    'AXISBANK.NS', 'MARUTI.NS', 'TITAN.NS', 'ULTRACEMCO.NS', 'TECHM.NS'
+]
+
+HTML_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ਟ੍ਰੈਕਟਰ ਜੀ - Backtesting ਐਪ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial; margin: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
+        .btn { background: #007bff; color: white; padding: 10px; border: none; border-radius: 5px; margin: 5px; }
+        .stock-card { background: #e9ecef; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .good { border-left: 5px solid #28a745; }
+        .avg { border-left: 5px solid #ffc107; }
+        .poor { border-left: 5px solid #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📈 ਟ੍ਰੈਕਟਰ ਜੀ - ਸਟਾਕ Backtesting</h2>
+        
+        <button class="btn" onclick="testToday()">ਅੱਜ ਦੇ ਡੇਟਾ 'ਤੇ ਟੈਸਟ ਕਰੋ</button>
+        <button class="btn" onclick="testYesterday()">ਕਲ ਦੇ ਡੇਟਾ 'ਤੇ ਟੈਸਟ ਕਰੋ</button>
+        <button class="btn" onclick="testLastWeek()">ਪਿਛਲੇ ਹਫ਼ਤੇ ਟੈਸਟ ਕਰੋ</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function testToday() {
+            runTest('today');
+        }
+        
+        async function testYesterday() {
+            runTest('yesterday');
+        }
+        
+        async function testLastWeek() {
+            runTest('lastweek');
+        }
+        
+        async function runTest(period) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="stock-card">ਟੈਸਟਿੰਗ ਚੱਲ ਰਹੀ ਹੈ... ਕਿਰਪਾ ਕਰਕੇ ਉਡੀਕ ਕਰੋ</div>';
+            
+            try {
+                const response = await fetch('/backtest?period=' + period);
+                const data = await response.json();
+                
+                let html = '<h3>Backtesting ਨਤੀਜੇ:</h3>';
+                
+                data.results.forEach((stock, index) => {
+                    let ratingClass = 'avg';
+                    if (stock.score >= 80) ratingClass = 'good';
+                    if (stock.score <= 50) ratingClass = 'poor';
+                    
+                    html += `<div class="stock-card ${ratingClass}">
+                        <strong>${index + 1}. ${stock.symbol.replace('.NS', '')}</strong><br>
+                        Score: ${stock.score}/100<br>
+                        ਕੀਮਤ ਬਦਲਾਅ: ${stock.price_change}%<br>
+                        ਵਾਲੀਊਮ ਰੇਸ਼ੀਓ: ${stock.volume_ratio}x<br>
+                        ਮੋਮੈਂਟਮ: ${stock.momentum}<br>
+                        ਤਾਰੀਖ: ${stock.date}
+                    </div>`;
+                });
+                
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="stock-card poor">ਗਲਤੀ ਹੋਈ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ。</div>';
+            }
+        }
+    </script>
+</body>
+</html>
+'''
+
+def calculate_score(stock_data):
+    """ਸਟਾਕ ਦਾ score 0-100 ਵਿੱਚ ਕੈਲਕੁਲੇਟ ਕਰੋ"""
+    score = 50  # base score
+    
+    try:
+        # ਕੀਮਤ ਬਦਲਾਅ (30 points)
+        price_change = ((stock_data['Close'][-1] - stock_data['Close'][0]) / stock_data['Close'][0]) * 100
+        score += min(30, abs(price_change) * 0.5)
+        
+        # ਵਾਲੀਊਮ ਰੇਸ਼ੀਓ (30 points)
+        volume_ratio = stock_data['Volume'][-1] / stock_data['Volume'].mean()
+        score += min(30, volume_ratio * 10)
+        
+        # ਮੋਮੈਂਟਮ (20 points)
+        momentum = stock_data['Close'][-1] > stock_data['Close'].mean()
+        if momentum:
+            score += 20
+            
+        # High-Low range (20 points)
+        high_low_ratio = (stock_data['High'].max() - stock_data['Low'].min()) / stock_data['Close'].mean()
+        score += min(20, high_low_ratio * 100)
+        
+    except:
+        pass
+    
+    return min(100, max(0, int(score)))
+
+def get_momentum_text(score):
+    """ਮੋਮੈਂਟਮ ਦਾ text return ਕਰੋ"""
+    if score >= 80:
+        return "ਬਹੁਤ ਵਧੀਆ"
+    elif score >= 60:
+        return "ਵਧੀਆ" 
+    elif score >= 40:
+        return "ਠੀਕ ਠਾਕ"
+    else:
+        return "ਕਮਜ਼ੋਰ"
+
+@app.route('/')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/backtest')
+def backtest():
+    period = request.args.get('period', 'today')
+    
+    # Date range ਸੈੱਟ ਕਰੋ
+    end_date = datetime.now().date()
+    
+    if period == 'yesterday':
+        end_date = end_date - timedelta(days=1)
+        start_date = end_date - timedelta(days=1)
+    elif period == 'lastweek':
+        start_date = end_date - timedelta(days=7)
+    else:  # today
+        start_date = end_date - timedelta(days=1)
+    
+    results = []
+    
+    for symbol in TOP_STOCKS:
+        try:
+            # Historical data ਲੋ
+            stock_data = yf.download(symbol, start=start_date, end=end_date + timedelta(days=1), interval='1h')
+            
+            if len(stock_data) > 5:
+                # Score ਕੈਲਕੁਲੇਟ ਕਰੋ
+                score = calculate_score(stock_data)
+                
+                # Price change
+                price_change = ((stock_data['Close'][-1] - stock_data['Close'][0]) / stock_data['Close'][0]) * 100
+                
+                # Volume ratio
+                volume_ratio = round(stock_data['Volume'][-1] / stock_data['Volume'].mean(), 2)
+                
+                results.append({
+                    'symbol': symbol,
+                    'score': score,
+                    'price_change': round(price_change, 2),
+                    'volume_ratio': volume_ratio,
+                    'momentum': get_momentum_text(score),
+                    'date': start_date.strftime('%Y-%m-%d')
+                })
+                
+        except Exception as e:
+            print(f"Error with {symbol}: {e}")
+    
+    # Score ਦੇ ਅਨੁਸਾਰ sort ਕਰੋ
+    results.sort(key=lambda x: x['score'], reverse=True)
+    
+    return jsonify({'results': results[:10]})  # ਸਿਰਫ਼ ਟਾਪ 10
+
+if _name_ == '_main_':
+    app.run(debug=True)
