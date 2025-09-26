@@ -1,0 +1,27 @@
+# ਕਲ ਦੇ ਡੇਟਾ 'ਤੇ ਟੈਸਟ ਕਰਨ ਲਈ (ਜੇਕਰ ਤੁਸੀਂ ਸਵੇਰੇ ਮਾਰਕੀਟ ਖੁੱਲਣ ਤੋਂ ਪਹਿਲਾਂ ਚੈੱਕ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ)
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
+
+def pre_market_screener():
+    # ਕਲ ਦਾ ਡੇਟਾ ਵਰਤੋਂ
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=7)  # ਪਿਛਲੇ 7 ਦਿਨ
+    
+    stock_symbols = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS']  # ਆਪਣੇ ਸਟਾਕਸ ਜੋੜੋ
+    
+    for symbol in stock_symbols:
+        try:
+            # ਪਿਛਲੇ ਦਿਨਾਂ ਦਾ ਡੇਟਾ ਲੋ
+            stock_data = yf.download(symbol, start=start_date, end=end_date, interval='5m')
+            
+            if len(stock_data) > 0:
+                print(f"\n{symbol} ਦਾ ਇਤਿਹਾਸਕ ਡੇਟਾ:")
+                print(f"ਆਖਰੀ ਕੀਮਤ: {stock_data['Close'][-1]}")
+                print(f"ਆਖਰੀ ਵਾਲੀਊਮ: {stock_data['Volume'][-1]}")
+                
+        except Exception as e:
+            print(f"Error with {symbol}: {e}")
+
+# ਸਵੇਰੇ ਮਾਰਕੀਟ ਖੁੱਲਣ ਤੋਂ ਪਹਿਲਾਂ ਚਲਾਓ
+pre_market_screener()
