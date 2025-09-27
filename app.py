@@ -20,6 +20,7 @@ try:
             print(f"{i}. {stock['ticker']}: ${stock['price']} ({stock['change_percentage']})")
     else:
         print("ਕੋਈ ਡੇਟਾ ਨਹੀਂ ਮਿਲਿਆ")
+        print("ਕਾਰਨ: ਮਾਰਕੀਟ ਬੰਦ ਹੋਣਾ ਜਾਂ API ਕੁੰਜੀ ਸਮੱਸਿਆ")
         
 except Exception as e:
     print(f"ਗਲਤੀ: {e}")
