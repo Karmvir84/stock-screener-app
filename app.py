@@ -5,7 +5,7 @@ import schedule
 import time
 import threading
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 def get_intraday_data(symbol):
     try:
